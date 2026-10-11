@@ -189,6 +189,25 @@ html.clone-mode,
   display:block;
 }
 
+.vp-text-logo {
+  font-size:20px;
+  font-weight:900;
+  letter-spacing:-.5px;
+  line-height:1;
+  text-transform:uppercase;
+  color:var(--text-main);
+  display:inline-flex;
+  align-items:center;
+}
+
+.vp-text-logo-accent {
+  color:#fff;
+  background:var(--accent);
+  padding:2px 5px;
+  border-radius:4px;
+  margin-left:3px;
+}
+
 .vp-region-sex{
   display:flex;
   align-items:flex-start;
