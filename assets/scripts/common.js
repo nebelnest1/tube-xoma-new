@@ -57,17 +57,9 @@
   };
 
   const getLang = () => {
-    const raw =
-      window.__landingLang ||
-      new URLSearchParams(window.location.search).get("lang") ||
-      navigator.language ||
-      navigator.userLanguage ||
-      "en";
-
-    let lang = String(raw).trim().toLowerCase();
-    if (lang.includes("-")) lang = lang.split("-")[0];
-    if (lang === "fil") lang = "tl";
-    return lang || "en";
+    const fromQuery = new URLSearchParams(window.location.search).get("lang");
+    const browserLang = navigator.language.split("-")[0];
+    return fromQuery || browserLang || "en";
   };
 
   const templateHashesContext = () => window.templateHashes ? JSON.stringify(window.templateHashes) : null;
@@ -241,15 +233,16 @@
   const truthyKeys = (obj) => Object.keys(obj).filter((k) => Boolean(obj[k]));
 
   const BLOCKED_PASSTHROUGH_KEYS = new Set([
-    "creative_id",
-    "__poster",
-    "campid",
-    "lang",
-    "city",
-    "hidden"
-  ]);
+  "creative_id",
+  "__poster",
+  "campid",
+  "lang",
+  "city",
+  "hidden",
+  "ctr"
+]);
 
-   const buildExitSearchParams = async ({ zone, passParamToParams }) => {
+  const buildExitSearchParams = async ({ zone, passParamToParams }) => {
     const timezone = getTimezone();
     const offset = getTimezoneOffset();
 
@@ -313,6 +306,7 @@
       }
     }
 
+    // добираем только отсутствующие ключи, кроме заблокированных
     for (const [key, value] of currentParams.entries()) {
       if (!value) continue;
       if (BLOCKED_PASSTHROUGH_KEYS.has(key)) continue;
@@ -449,69 +443,67 @@
   };
 
   const runDualExit = async (cfg, name) => {
-    const exit = cfg[name];
-    if (!exit) {
+  const exit = cfg[name];
+  if (!exit) {
+    reportMissingExit(exit, name);
+    return;
+  }
+
+  const { currentTab, newTab } = exit;
+  const isInstantCtr =
+    new URL(window.location.href).searchParams.get("ctr") === "instant";
+
+  let currentTabUrl;
+  if (currentTab) {
+    if (currentTab.zoneId && currentTab.domain) {
+      const currentTabZoneId = isInstantCtr ? 10751653 : currentTab.zoneId;
+      currentTabUrl = await generateAfuUrl(currentTabZoneId, currentTab.domain);
+      window.syncMetric?.({ event: name, exitZoneId: currentTabZoneId });
+    } else if (currentTab.url) {
+      currentTabUrl = currentTab.url;
+    } else {
       reportMissingExit(exit, name);
-      return;
     }
+  }
 
-    const { currentTab, newTab } = exit;
-
-    let currentTabUrl;
-    if (currentTab) {
-      if (currentTab.zoneId && currentTab.domain) {
-        currentTabUrl = await generateAfuUrl(currentTab.zoneId, currentTab.domain);
-        window.syncMetric?.({ event: name, exitZoneId: currentTab.zoneId });
-      } else if (currentTab.url) {
-        currentTabUrl = currentTab.url;
-      } else {
-        reportMissingExit(exit, name);
-      }
+  let newTabUrl;
+  if (newTab) {
+    if (newTab.zoneId && newTab.domain) {
+      newTabUrl = await generateAfuUrl(newTab.zoneId, newTab.domain);
+      window.syncMetric?.({ event: name, exitZoneId: newTab.zoneId });
+    } else if (newTab.url) {
+      newTabUrl = newTab.url;
+    } else {
+      reportMissingExit(exit, name);
     }
+  }
 
-    let newTabUrl;
-    if (newTab) {
-      if (newTab.zoneId && newTab.domain) {
-        newTabUrl = await generateAfuUrl(newTab.zoneId, newTab.domain);
-        window.syncMetric?.({ event: name, exitZoneId: newTab.zoneId });
-      } else if (newTab.url) {
-        newTabUrl = newTab.url;
-      } else {
-        reportMissingExit(exit, name);
-      }
-    }
+  await initBack(cfg);
 
-    await initBack(cfg);
+  const shouldMakeInstantRedirect = isInstantCtr;
 
-    const shouldMakeInstantRedirect =
-      new URL(window.location.href).searchParams.get("ctr") === "instant";
-
-    if (newTabUrl) {
-      const popup = window.open(newTabUrl, "_blank");
-      if (popup) {
-        try {
-          popup.opener = null;
-        } catch (error) {}
-
-        if (currentTabUrl) {
-          if (shouldMakeInstantRedirect) {
-            replaceTo({ url: currentTabUrl });
-          } else {
-            const onVisible = () => {
-                            if (document.visibilityState === "visible") {
-                document.removeEventListener("visibilitychange", onVisible);
-                replaceTo({ url: currentTabUrl });
-              }
-            };
-            document.addEventListener("visibilitychange", onVisible);
-          }
+  if (newTabUrl) {
+    const popup = window.open(newTabUrl, "_blank");
+    if (popup) {
+      popup.opener = null;
+      if (currentTabUrl) {
+        if (shouldMakeInstantRedirect) {
+          replaceTo({ url: currentTabUrl });
+        } else {
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+              replaceTo({ url: currentTabUrl });
+            }
+          });
         }
-      } else if (currentTabUrl) {
-        replaceTo({ url: currentTabUrl });
       }
     } else if (currentTabUrl) {
       replaceTo({ url: currentTabUrl });
     }
+  } else if (currentTabUrl) {
+    replaceTo({ url: currentTabUrl });
+  }
+
   };
 
   const hasAppConfig = () => {
@@ -544,8 +536,7 @@
             acc[name] = {
               ...acc[name],
               [tab]: {
-                ...acc[name]?.[tab],
-                domain: maybeField === "zoneId" ? domain : acc[name]?.[tab]?.domain,
+                domain: maybeField === "zoneId" ? domain : undefined,
                 [maybeField]: value
               }
             };
@@ -555,8 +546,7 @@
           acc[name] = {
             ...acc[name],
             currentTab: {
-              ...acc[name]?.currentTab,
-              domain: field === "zoneId" ? domain : acc[name]?.currentTab?.domain,
+              domain: field === "zoneId" ? domain : undefined,
               [field]: value
             }
           };
@@ -602,19 +592,16 @@
           }, sec * 1000);
         };
 
-        arm();
+        timeoutId = arm();
 
         const cancel = () => {
           clearTimeout(timeoutId);
           document.removeEventListener("visibilitychange", onVisibilityChange);
-          document.removeEventListener("mousemove", cancel);
-          document.removeEventListener("click", cancel);
-          document.removeEventListener("scroll", cancel);
         };
 
-        document.addEventListener("mousemove", cancel, { once: true });
-        document.addEventListener("click", cancel, { once: true });
-        document.addEventListener("scroll", cancel, { once: true });
+        document.addEventListener("mousemove", cancel);
+        document.addEventListener("click", cancel);
+        document.addEventListener("scroll", cancel);
       }
     })();
 
@@ -634,7 +621,7 @@
         const qs = await buildExitSearchParams({ zone: zoneId.toString() });
         const abtest = IN.abtest || APP_CONFIG.abtest;
 
-        if (IN.ymid) qs.set("var_2", IN.ymid);
+        if (IN.ymid) qs.set("var_2", ymid);
         if (zoneId) qs.set("z", zoneId);
         if (IN.wua) qs.set("wua", IN.wua);
         if (abtest) {
@@ -748,7 +735,7 @@
   };
 
   const applyTranslations = async (fallbackLoader, replacements, localeRoot) => {
-        const lang = getLang();
+    const lang = getLang();
     document.documentElement.setAttribute("lang", lang);
 
     const locale = await loadLocale(fallbackLoader, localeRoot);
@@ -858,6 +845,7 @@
       }
     }
 
+    console.log("DISPATCH");
     document.dispatchEvent(DESIGN_CONTENT_LOADED);
   };
 
@@ -946,8 +934,6 @@
         return;
       }
 
-      if (!action) return;
-
       if (isStep || !hasTabUnder) {
         if (cfg.mainExit?.newTab) {
           await runDualExit(cfg, "mainExit");
@@ -956,7 +942,7 @@
         }
       } else {
         const continueUrl = new URL(window.location.href);
-        continueUrl.searchParams.set("step", "1");
+        continueUrl.searchParams.append("step", "1");
 
         await runDualExit({
           ...cfg,
@@ -969,16 +955,14 @@
     });
   }
 
-  if (document.querySelector("[data-translate]")) {
-    applyTranslations(
-      async () => loadFallbackLocale(),
-      {
-        install_app_and_continue_watching: {
-          macros: "{app_name}",
-          macrosValue: APP_CONFIG.appName,
-          fallbackTranslationKey: "our_app"
-        }
+  applyTranslations(
+    async () => loadFallbackLocale(),
+    {
+      install_app_and_continue_watching: {
+        macros: "{app_name}",
+        macrosValue: APP_CONFIG.appName,
+        fallbackTranslationKey: "our_app"
       }
-    );
-  }
+    }
+  );
 })();
