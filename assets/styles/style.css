@@ -1052,3 +1052,24 @@ html[dir="rtl"] .vp-action-value,
 html[dir="rtl"] .vp-action-label{
   direction: ltr;
 }
+
+/* ===== MOBILE: EDGE-TO-EDGE LAYOUT =====
+   Убираем поля body и лимит 420px только на мобильных.
+   Десктопный вид и все остальные компоненты не меняем. */
+@media (max-width:600px){
+  body{
+    width:100%;
+    padding-left:0;
+    padding-right:0;
+  }
+
+  .fade-in-wrapper{
+    max-width:none;
+    box-shadow:none;
+  }
+
+  .clone-mode .fade-in-wrapper{
+    max-width:none!important;
+    box-shadow:none!important;
+  }
+}
