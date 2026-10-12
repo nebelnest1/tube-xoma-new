@@ -554,7 +554,7 @@
     const posterParam = sanitizeText(urlParams.get("__poster"), 500);
     const cid = sanitizeText(urlParams.get("var_2"), 120);
     const cr = sanitizeText(urlParams.get("creative_id"), 120);
-    let posterSrc = "./assets/images/1.webp";
+    let posterSrc = "./assets/images/default.webp";
 
     if (posterParam) posterSrc = posterParam;
     else if (cid && cr) posterSrc = `https://cdn.x0x.online/frames/${encodeURIComponent(cid)}/${encodeURIComponent(cr)}.webp`;
@@ -563,7 +563,7 @@
       frame.src = posterSrc;
       frame.classList.add("is-ready");
       frame.addEventListener("error", function onError() {
-        if (frame.src.indexOf("./assets/images/1.webp") === -1) frame.src = "./assets/images/1.webp";
+        if (frame.src.indexOf("./assets/images/default.webp") === -1) frame.src = "./assets/images/default.webp";
         frame.classList.add("is-ready");
       }, { once: true });
       if (urlParams.get("hidden") === "true") frame.classList.add("hidden-cam-effect");
