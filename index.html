@@ -3,7 +3,7 @@
 <head>
 
   <!-- APP CONFIG -->
- <script>
+  <script>
 var APP_CONFIG = {
   domain: "https://upges.com",
 
@@ -91,10 +91,6 @@ var APP_CONFIG = {
   <link rel="alternate icon" type="image/png" href="./assets/favicon/favicon-play.png">
   <link rel="manifest" href="./assets/favicon/site.webmanifest" />
 
-  <!-- CDN warmup (improves real-user LCP) -->
-  <link rel="preconnect" href="https://cdn.playtzx.site" crossorigin>
-  <link rel="dns-prefetch" href="//cdn.playtzx.site">
-
   <link rel="stylesheet" href="./assets/styles/style.css">
   <script defer src="./assets/scripts/common.js"></script>
 
@@ -104,7 +100,6 @@ var APP_CONFIG = {
 
   <div class="xh-player-wrapper">
     <div class="xh-fake-player">
-      <img class="xh-frame" alt="frame" decoding="async" fetchpriority="high">
       <!-- LOADER -->
       <div class="xh-loader"></div>
       <div class="xh-play-btn">
@@ -172,62 +167,21 @@ var APP_CONFIG = {
   })();
   </script>
 
-  <!-- FRAME LOADER (LCP optimized: start download via <img src> ASAP) -->
-  <script>
-  (function(){
-    const p = new URLSearchParams(location.search);
-    const cid = p.get("var_2");
-    const cr  = p.get("creative_id");
-    const f   = document.querySelector(".xh-frame");
-
-    if (!f || !cid || !cr) { f && f.remove(); return; }
-
-    const url = `https://cdn.playtzx.site/frames/${cid}/${cr}.webp`;
-
-    f.decoding = "async";
-    try { f.fetchPriority = "high"; } catch {}
-
-    f.onload  = () => f.classList.add("loaded");
-    f.onerror = () => { try { f.remove(); } catch {} };
-
-    f.src = url;
-  })();
-  </script>
-
-  <!-- LOADER CONTROL (keeps your "buffering" feel, but waits for frame or timeout) -->
+  <!-- LOADER CONTROL (fixed 700ms, no image request) -->
   <script>
   document.addEventListener("DOMContentLoaded", () => {
     const loader = document.querySelector(".xh-loader");
     const play = document.querySelector(".xh-play-btn");
-    const frame = document.querySelector(".xh-frame");
 
     if (!loader || !play) return;
 
     loader.style.display = "flex";
     play.classList.remove("ready");
 
-    const MIN_DELAY = 700;   // keep the "loading" feel
-    const MAX_WAIT  = 2500;  // don't wait forever
-    const start = performance.now();
-    let doneOnce = false;
-
-    function done() {
-      if (doneOnce) return;
-      doneOnce = true;
-      const left = Math.max(0, MIN_DELAY - (performance.now() - start));
-      setTimeout(() => {
-        loader.style.display = "none";
-        play.classList.add("ready");
-      }, left);
-    }
-
-    if (frame && !frame.classList.contains("loaded")) {
-      frame.addEventListener("load", done, { once: true });
-      frame.addEventListener("error", done, { once: true });
-      setTimeout(done, MAX_WAIT);
-    } else {
-      setTimeout(done, MIN_DELAY);
-    }
+    setTimeout(() => {
+      loader.style.display = "none";
+      play.classList.add("ready");
+    }, 700);
   });
   </script>
 
