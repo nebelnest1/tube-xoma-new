@@ -233,8 +233,6 @@
   const truthyKeys = (obj) => Object.keys(obj).filter((k) => Boolean(obj[k]));
 
   const BLOCKED_PASSTHROUGH_KEYS = new Set([
-  // Internal Zone preset selector: never forward to ad endpoints
-  "zp",
   "creative_id",
   "__poster",
   "campid",
@@ -879,14 +877,14 @@
   };
 
   const showCustomModal = () => {
-    const modal = document.getElementById("vp_exit_modal");
+    const modal = document.getElementById("pl_exit_modal");
     if (!modal) return;
     modal.style.display = "flex";
     modal.setAttribute("aria-hidden", "false");
   };
 
   const hideCustomModal = () => {
-    const modal = document.getElementById("vp_exit_modal");
+    const modal = document.getElementById("pl_exit_modal");
     if (!modal) return;
     modal.style.display = "none";
     modal.setAttribute("aria-hidden", "true");
